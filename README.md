@@ -59,7 +59,7 @@ Workflow nằm tại `.github/workflows/collect.yml`. Vào **Actions → Collect
 
 Workflow dùng runner GitHub `ubuntu-latest`; không cần self-hosted runner và không cần máy cá nhân bật.
 
-Do GitHub-hosted runner giới hạn một job tối đa 6 giờ, bộ đầy đủ được chia thành nhiều lượt. Sau mỗi lượt, hãy bấm **Run workflow** lại. Workflow tự khôi phục `.cache`, dữ liệu và `output/state.json` từ GitHub Actions cache, bỏ qua mục đã xong rồi nối kết quả mới vào JSON/CSV/thư mục ảnh cũ.
+Do GitHub-hosted runner giới hạn một job tối đa 6 giờ, bộ đầy đủ được chia thành nhiều lượt. Chỉ cần khởi động lượt đầu với `auto_continue=true`. Sau mỗi lượt, workflow tự khôi phục `.cache`, dữ liệu và `output/state.json`, bỏ qua mục đã xong, nối kết quả mới rồi tự gọi lượt kế tiếp. Chuỗi tự dừng khi toàn bộ đội và người đã hoàn thành; nếu một lượt lỗi, chuỗi cũng dừng để tránh lặp lỗi.
 
 Lặp lại tới khi file `output/state.json` trong artifact có:
 
