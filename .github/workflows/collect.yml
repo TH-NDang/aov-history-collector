@@ -1,0 +1,84 @@
+name: Collect AoV historical teams and people
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit_teams:
+        description: "Số trang đội xử lý trong lượt này"
+        required: false
+        default: "80"
+      limit_people:
+        description: "Số tuyển thủ/staff xử lý trong lượt này"
+        required: false
+        default: "80"
+      skip_images:
+        description: "Bỏ qua tải ảnh"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    concurrency:
+      group: aov-history-collector
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Restore collection checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache
+            output
+          key: aov-history-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            aov-history-${{ runner.os }}-
+
+      - name: Validate parsers
+        run: python -m unittest discover -s tests -v
+
+      - name: Collect data and images
+        shell: bash
+        run: |
+          args=(--limit-teams "${{ inputs.limit_teams }}" --limit-people "${{ inputs.limit_people }}")
+          if [[ "${{ inputs.skip_images }}" == "true" ]]; then
+            args+=(--skip-images)
+          fi
+          python collector.py "${args[@]}"
+
+      - name: Package output
+        if: always()
+        run: python package_output.py
+
+      - name: Save collection checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache
+            output
+          key: aov-history-${{ runner.os }}-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aov-history-data-${{ github.run_number }}
+          path: |
+            aov-history-data.zip
+            output/manifest.json
+            output/state.json
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 30
