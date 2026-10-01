@@ -1,6 +1,10 @@
 name: Collect AoV historical teams and people
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/collect.yml"
   workflow_dispatch:
     inputs:
       limit_teams:
@@ -16,6 +20,11 @@ on:
         type: boolean
         required: false
         default: false
+      auto_continue:
+        description: "Tự chạy lượt tiếp theo cho đến khi hoàn tất"
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   collect:
@@ -26,6 +35,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +62,7 @@ jobs:
       - name: Collect data and images
         shell: bash
         run: |
-          args=(--limit-teams "${{ inputs.limit_teams }}" --limit-people "${{ inputs.limit_people }}")
+          args=(--limit-teams "${{ inputs.limit_teams || '80' }}" --limit-people "${{ inputs.limit_people || '80' }}")
           if [[ "${{ inputs.skip_images }}" == "true" ]]; then
             args+=(--skip-images)
           fi
@@ -82,3 +92,49 @@ jobs:
           if-no-files-found: warn
           compression-level: 0
           retention-days: 30
+
+      - name: Check collection progress
+        id: progress
+        if: success()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          state = json.loads(Path("output/state.json").read_text(encoding="utf-8"))
+          progress = state.get("progress", {})
+          known_teams = int(progress.get("known_team_pages", 0))
+          finished_teams = int(progress.get("finished_team_pages", 0))
+          known_people = int(progress.get("known_people", 0))
+          finished_people = int(progress.get("finished_people", 0))
+          complete = (
+              known_teams > 0
+              and finished_teams == known_teams
+              and finished_people == known_people
+          )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"complete={str(complete).lower()}\n")
+
+          print(
+              f"Teams: {finished_teams}/{known_teams}; "
+              f"people: {finished_people}/{known_people}; complete={complete}"
+          )
+          PY
+
+      - name: Start next batch automatically
+        if: >-
+          steps.progress.outputs.complete == 'false' &&
+          (github.event_name == 'push' || inputs.auto_continue == true)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            "repos/${{ github.repository }}/actions/workflows/collect.yml/dispatches" \
+            -f ref="${{ github.ref_name }}" \
+            -f "inputs[limit_teams]=${{ inputs.limit_teams || '80' }}" \
+            -f "inputs[limit_people]=${{ inputs.limit_people || '80' }}" \
+            -f "inputs[skip_images]=${{ inputs.skip_images || 'false' }}" \
+            -f "inputs[auto_continue]=true"
