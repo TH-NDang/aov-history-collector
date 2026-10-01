@@ -1,0 +1,22 @@
+{
+  "wiki": "honorofkings",
+  "api_url": "https://liquipedia.net/honorofkings/api.php",
+  "commons_api_url": "https://liquipedia.net/commons/api.php",
+  "base_url": "https://liquipedia.net/honorofkings/",
+  "user_agent": "AOVHistoricalRosterCollector/1.0 (https://github.com/TH-NDang/aov-liquipedia-crawler)",
+  "categories": {
+    "teams": ["Teams"],
+    "players": ["Players"]
+  },
+  "recursive_categories": false,
+  "games": ["Arena of Valor"],
+  "include_player_category": false,
+  "api_delay_seconds": 2.1,
+  "parse_delay_seconds": 30.5,
+  "image_delay_seconds": 2.1,
+  "max_api_requests_per_hour": 58,
+  "output_dir": "output",
+  "resume": true,
+  "download_images": true,
+  "duplicate_portraits_per_team": true
+}
