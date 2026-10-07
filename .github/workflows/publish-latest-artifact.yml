@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           artifact_id="$(gh api "repos/${GH_REPO}/actions/artifacts?per_page=100" \
             --jq '.artifacts
-              | map(select(.expired == false and .name == "aov-history-data"))
+              | map(select(.expired == false and (.name | startswith("aov-history-data-"))))
               | sort_by(.created_at)
               | reverse
               | .[0].id')"
