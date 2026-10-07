@@ -67,15 +67,18 @@ jobs:
         run: |
           set -euo pipefail
           tag="aov-history-raw-2026-10-07"
-          notes="Raw cumulative collector snapshot preserved from GitHub Actions.
+          printf '%s\n' \
+            'Raw cumulative collector snapshot preserved from GitHub Actions.' \
+            '' \
+            'Warning: this snapshot has not yet been cleaned. Some Honor of Kings teams and roster records may be mixed with Arena of Valor data.' \
+            '' \
+            'The ZIP contains JSON, CSV, images, manifests, and continuation state. A SHA-256 checksum is included.' \
+            > release-notes.md
 
-Warning: this snapshot has not yet been cleaned. Some Honor of Kings teams and roster records may be mixed with Arena of Valor data.
-
-The ZIP contains JSON, CSV, images, manifests, and continuation state. A SHA-256 checksum is included."
           gh release create "$tag" \
             release-assets/aov-history-data-raw.zip \
             release-assets/aov-history-data-raw.zip.sha256 \
             --repo "$GH_REPO" \
             --target "${GITHUB_SHA}" \
             --title "AoV history raw snapshot — 2026-10-07" \
-            --notes "$notes"
+            --notes-file release-notes.md
