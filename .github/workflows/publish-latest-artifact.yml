@@ -1,0 +1,81 @@
+name: Publish latest artifact to Release
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/publish-latest-artifact.yml"
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Locate latest available data artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id="$(gh api "repos/${GH_REPO}/actions/artifacts?per_page=100" \
+            --jq '.artifacts
+              | map(select(.expired == false and .name == "aov-history-data"))
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id')"
+          if [ -z "$artifact_id" ] || [ "$artifact_id" = "null" ]; then
+            echo "No unexpired aov-history-data artifact was found." >&2
+            exit 1
+          fi
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download and prepare release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloaded release-assets
+          gh api "repos/${GH_REPO}/actions/artifacts/${ARTIFACT_ID}/zip" > downloaded/artifact.zip
+          unzip -q downloaded/artifact.zip -d downloaded/content
+
+          data_zip="$(find downloaded/content -type f -name 'aov-history-data.zip' -print -quit)"
+          if [ -n "$data_zip" ]; then
+            cp "$data_zip" release-assets/aov-history-data-raw.zip
+          else
+            (
+              cd downloaded/content
+              zip -qr ../../release-assets/aov-history-data-raw.zip .
+            )
+          fi
+
+          sha256sum release-assets/aov-history-data-raw.zip \
+            > release-assets/aov-history-data-raw.zip.sha256
+
+      - name: Create permanent GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="aov-history-raw-2026-10-07"
+          notes="Raw cumulative collector snapshot preserved from GitHub Actions.
+
+Warning: this snapshot has not yet been cleaned. Some Honor of Kings teams and roster records may be mixed with Arena of Valor data.
+
+The ZIP contains JSON, CSV, images, manifests, and continuation state. A SHA-256 checksum is included."
+          gh release create "$tag" \
+            release-assets/aov-history-data-raw.zip \
+            release-assets/aov-history-data-raw.zip.sha256 \
+            --repo "$GH_REPO" \
+            --target "${GITHUB_SHA}" \
+            --title "AoV history raw snapshot — 2026-10-07" \
+            --notes "$notes"
